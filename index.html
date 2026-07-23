@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Ocean Scenes</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;700&family=Space+Mono&display=swap"
+        rel="stylesheet">
+
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --fg: #f0cfa0;
+            --fg-dim: rgba(240, 207, 160, .55);
+            --fg-hud: rgba(240, 207, 160, .7);
+            --fg-dot: rgba(240, 207, 160, .3);
+            --fg-dotact: rgba(240, 207, 160, .9);
+            --bg: #0a0a0f;
+            --scrim: .18;
+        }
+
+        html {
+            scroll-behavior: auto;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--fg);
+            font-family: "Space Grotesk", sans-serif;
+            overflow-x: hidden;
+            cursor: crosshair;
+        }
+
+
+        #webgl_canvas {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            display: block;
+        }
+
+
+        #hud {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 1.5rem 2rem;
+        }
+
+        #hud-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        #hud-bottom {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+
+        .mono {
+            font-family: "Space Mono", monospace;
+        }
+
+        #scene_name,
+        #hud_pct {
+            font-family: "Space Mono", monospace;
+            font-size: .75rem;
+            letter-spacing: .25em;
+            color: var(--fg-hud);
+            text-shadow: 0 1px 8px #000;
+        }
+
+
+        #prog_bar {
+            width: 120px;
+            height: 2px;
+            background: rgba(255, 255, 255, .15);
+            margin-top: .5rem;
+        }
+
+        #prog_fill {
+            height: 100%;
+            width: 0%;
+            background: var(--fg-hud);
+        }
+
+
+        #scene_dots {
+            position: fixed;
+            right: 1.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            gap: .5rem;
+        }
+
+        .scene-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--fg-dot);
+        }
+
+        .scene-dot.active {
+            background: var(--fg-dotact);
+            transform: scale(1.5);
+        }
+
+
+        #scroll_track {
+            position: relative;
+            z-index: 5;
+        }
+
+
+        .scene-section {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding: 0 2.5rem 4.5rem;
+        }
+
+
+        .scene-title {
+            font-weight: 700;
+            font-size: clamp(2.8rem, 8vw, 6.5rem);
+            line-height: .95;
+            color: var(--fg);
+            text-shadow: 0 2px 40px #000;
+            opacity: 0;
+            transform: translateY(18px);
+            transition: .7s;
+        }
+
+
+        .scene-title.visible {
+            opacity: 1;
+            transform: none;
+        }
+
+
+        .scene-desc {
+            font-weight: 300;
+            font-size: clamp(.88rem, 2vw, 1.1rem);
+            max-width: 420px;
+            margin-top: .75rem;
+            line-height: 1.55;
+            color: var(--fg);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: .7s;
+        }
+
+
+        .scene-desc.visible {
+            opacity: .88;
+            transform: none;
+        }
+
+
+        .h-line {
+            width: 36px;
+            height: 1px;
+            background: var(--fg);
+            opacity: .4;
+            margin-bottom: 1rem;
+        }
+
+
+        .scene-label {
+            font-family: "Space Mono", monospace;
+            font-size: .7rem;
+            letter-spacing: .3em;
+            text-transform: uppercase;
+            opacity: .45;
+            margin-bottom: .5rem;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <canvas id="webgl_canvas"></canvas>
+
+
+    <div id="hud">
+
+        <div id="hud-top">
+
+            <div>
+                <div id="scene_name" class="mono">DAWN</div>
+            </div>
+
+
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.4rem;">
+                <div id="hud_pct" class="mono">000%</div>
+
+                <div id="prog_bar">
+                    <div id="prog_fill"></div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <div id="hud-bottom"></div>
+
+    </div>
+
+
+    <div id="scene_dots">
+        <div class="scene-dot active"></div>
+        <div class="scene-dot"></div>
+        <div class="scene-dot"></div>
+        <div class="scene-dot"></div>
+        <div class="scene-dot"></div>
+        <div class="scene-dot"></div>
+    </div>
+
+
+
+    <div id="scroll_track">
+
+
+      <div class="scene-section">
+    <div class="h-line"></div>
+    <div class="scene-label">Scene 01 / 08</div>
+    <div class="scene-title">INTRODUCTION</div>
+    <div class="scene-desc">
+        Every journey begins with a vision. A story shaped by curiosity, dedication, and the passion to learn, create, and grow beyond limits.
+    </div>
+</div>
+
+
+<div class="scene-section">
+    <div class="h-line"></div>
+    <div class="scene-label">Scene 02 / 08</div>
+    <div class="scene-title">WHO I AM</div>
+    <div class="scene-desc">
+        I am Suraj — a passionate individual driven by creativity and innovation. Exploring new ideas, solving problems, and transforming thoughts into meaningful experiences.
+    </div>
+</div>
+
+
+<div class="scene-section">
+    <div class="h-line"></div>
+    <div class="scene-label">Scene 03 / 08</div>
+    <div class="scene-title">EDUCATION</div>
+    <div class="scene-desc">
+        Knowledge became the foundation of my journey. Through continuous learning and dedication, I built the skills and understanding needed to move forward.
+    </div>
+</div>
+
+
+<div class="scene-section">
+    <div class="h-line"></div>
+    <div class="scene-label">Scene 04 / 08</div>
+    <div class="scene-title">QUALIFICATIONS</div>
+    <div class="scene-desc">
+        Every achievement represents commitment and growth. Academic milestones, certifications, and learning experiences reflect my journey toward excellence.
+    </div>
+</div>
+
+
+<div class="scene-section">
+    <div class="h-line"></div>
+    <div class="scene-label">Scene 05 / 08</div>
+    <div class="scene-title">SKILLS & PASSION</div>
+    <div class="scene-desc">
+        Creativity meets technology. My skills are shaped through practice, curiosity, and the desire to build solutions that create a lasting impact.
+    </div>
+</div>
+
+
+<div class="scene-section">
+    <div class="h-line"></div>
+    <div class="scene-label">Scene 06 / 08</div>
+    <div class="scene-title">ACHIEVEMENTS</div>
+    <div class="scene-desc">
+        Behind every milestone is hard work and persistence. Projects completed, goals achieved, and recognitions earned showcase my dedication and progress.
+    </div>
+</div>
+
+
+<div class="scene-section">
+    <div class="h-line"></div>
+    <div class="scene-label">Scene 07 / 08</div>
+    <div class="scene-title">EXPERIENCE</div>
+    <div class="scene-desc">
+        Learning comes alive through real-world challenges. Every opportunity brings new lessons, stronger abilities, and a deeper understanding of my craft.
+    </div>
+</div>
+
+
+<div class="scene-section">
+    <div class="h-line"></div>
+    <div class="scene-label">Scene 08 / 08</div>
+    <div class="scene-title">MY VISION</div>
+    <div class="scene-desc">
+        The journey continues toward new possibilities. With passion, creativity, and determination, I aim to create, inspire, and achieve more every day.
+    </div>
+</div>
+
+    <script src="ocean.js"></script>
+    <script>
+
+        const titles = document.querySelectorAll(".scene-title");
+        const desc = document.querySelectorAll(".scene-desc");
+        const sections = document.querySelectorAll(".scene-section");
+
+        const fill = document.getElementById("prog_fill");
+        const pct = document.getElementById("hud_pct");
+        const name = document.getElementById("scene_name");
+        const dots = document.querySelectorAll(".scene-dot");
+
+
+        window.addEventListener("scroll", () => {
+
+            let scroll = window.scrollY;
+            let total = document.body.scrollHeight - innerHeight;
+
+            let progress = (scroll / total) * 100;
+
+            fill.style.width = progress + "%";
+            pct.textContent = Math.floor(progress).toString().padStart(3, "0") + "%";
+
+
+            sections.forEach((s, i) => {
+
+                let top = s.offsetTop;
+                let active = scroll >= top - innerHeight * .5 &&
+                    scroll < top + innerHeight * .5;
+
+
+                if (active) {
+
+                    titles[i].classList.add("visible");
+                    desc[i].classList.add("visible");
+
+                    name.textContent = titles[i].textContent;
+
+                    dots.forEach(d => d.classList.remove("active"));
+                    dots[i].classList.add("active");
+
+                }
+
+            });
+
+        });
+
+    </script>
+</body>
+
+</html>
