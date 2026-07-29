@@ -2,41 +2,34 @@ const canvas = document.getElementById("webgl_canvas");
 
 const gl =
 canvas.getContext("webgl2", {
-    alpha:true,
+    alpha:false,
     antialias:false
 })
 ||
 canvas.getContext("webgl", {
-    alpha:true,
+    alpha:false,
     antialias:false
 });
 
 
 if(!gl){
+    canvas.style.background="#071522";
     throw "WebGL not supported";
 }
 
 
-// Vertex
 
-const vertexShaderSource = `
-
+const vertex = `
 attribute vec2 position;
 
 void main(){
-
-    gl_Position =
-    vec4(position,0.0,1.0);
-
+    gl_Position = vec4(position,0.0,1.0);
 }
-
 `;
 
 
 
-// Fragment
-
-const fragmentShaderSource = `
+const fragment = `
 
 precision mediump float;
 
@@ -46,12 +39,12 @@ uniform float scroll;
 
 
 
-float random(vec2 p){
+float noise(vec2 p){
 
-return fract(
-sin(dot(p,vec2(12.9898,78.233)))
-*43758.5453
-);
+    return fract(
+        sin(dot(p,vec2(12.9898,78.233)))
+        *43758.5453
+    );
 
 }
 
@@ -59,138 +52,176 @@ sin(dot(p,vec2(12.9898,78.233)))
 
 void main(){
 
-
-vec2 uv =
-gl_FragCoord.xy /
-resolution.xy;
+    vec2 uv =
+    gl_FragCoord.xy / resolution.xy;
 
 
 
-// Transparent base
+    // WEATHER COLORS
 
-vec4 result =
-vec4(0.0);
+    vec3 dawn =
+    vec3(0.65,0.45,0.38);
 
+    vec3 day =
+    vec3(0.20,0.55,0.95);
 
+    vec3 storm =
+    vec3(0.15,0.18,0.25);
 
-// Day Night overlay
-
-
-vec3 day =
-vec3(
-0.2,
-0.5,
-0.9
-);
-
-
-vec3 sunset =
-vec3(
-0.9,
-0.4,
-0.2
-);
-
-
-vec3 night =
-vec3(
-0.01,
-0.02,
-0.08
-);
+    vec3 night =
+    vec3(0.01,0.02,0.08);
 
 
 
-vec3 sky;
+    vec3 sky;
+
+
+    if(scroll < .33){
+
+        sky=mix(
+            dawn,
+            day,
+            scroll*3.0
+        );
+
+    }
+    else if(scroll < .66){
+
+        sky=mix(
+            day,
+            storm,
+            (scroll-.33)*3.0
+        );
+
+    }
+    else{
+
+        sky=mix(
+            storm,
+            night,
+            (scroll-.66)*3.0
+        );
+
+    }
 
 
 
-if(scroll < 0.5){
+    // SUN
 
-sky =
-mix(
-day,
-sunset,
-scroll*2.0
-);
+    float sun =
+    exp(
+        -distance(
+            uv,
+            vec2(.5,.35)
+        )*25.0
+    );
 
-}
-else{
 
-sky =
-mix(
-sunset,
-night,
-(scroll-0.5)*2.0
-);
-
-}
+    sky +=
+    vec3(1.0,.7,.3)
+    *
+    sun
+    *
+    (1.0-scroll);
 
 
 
-// soft light
+    // OCEAN
 
-float glow =
-exp(
--distance(
-uv,
-vec2(.5,.35)
-)*20.0
-);
-
-
-sky +=
-vec3(1.0,.6,.25)
-*
-glow
-*
-(1.0-scroll);
+    float wave =
+    (
+        sin(
+            uv.x*25.0+time
+        )
+        +
+        sin(
+            uv.x*12.0-time*.5
+        )
+    )
+    *.015;
 
 
 
-
-// stars
-
-float stars = 0.0;
-
-
-if(scroll > .65){
-
-stars =
-step(
-0.995,
-random(
-floor(uv*250.0)
-)
-);
-
-}
+    float horizon =
+    smoothstep(
+        .40,
+        .65,
+        uv.y+wave
+    );
 
 
 
-sky +=
-stars;
+    vec3 water =
+    vec3(
+        .01,
+        .16,
+        .28
+    );
 
 
 
-// overlay opacity
+    // WATER LIGHT
 
-float alpha =
-0.35;
+    float reflection =
+    sin(
+        uv.x*40.0+
+        time*2.0
+    )*.03;
 
 
-
-result =
-vec4(
-sky,
-alpha
-);
+    water += reflection;
 
 
 
-gl_FragColor =
-result;
+    vec3 color =
+    mix(
+        water,
+        sky,
+        horizon
+    );
 
+
+
+    // RAIN
+
+    if(scroll>.40 && scroll<.75){
+
+        float rain =
+        noise(
+            gl_FragCoord.xy*.08+
+            time
+        );
+
+
+        color +=
+        vec3(rain)*.12;
+
+    }
+
+
+
+    // STARS
+
+    if(scroll>.75){
+
+        float star =
+        step(
+            .997,
+            noise(
+                gl_FragCoord.xy*.3
+            )
+        );
+
+
+        color +=
+        vec3(star);
+
+    }
+
+
+
+    gl_FragColor =
+    vec4(color,1.0);
 
 }
 
@@ -198,45 +229,36 @@ result;
 
 
 
+function shader(type,source){
 
-// Shader create
+    let s=gl.createShader(type);
 
-function createShader(type,source){
+    gl.shaderSource(s,source);
 
-let shader =
-gl.createShader(type);
+    gl.compileShader(s);
 
-gl.shaderSource(
-shader,
-source
-);
-
-gl.compileShader(shader);
-
-return shader;
-
+    return s;
 }
 
 
 
-const program =
-gl.createProgram();
+let program=gl.createProgram();
 
 
 gl.attachShader(
 program,
-createShader(
+shader(
 gl.VERTEX_SHADER,
-vertexShaderSource
+vertex
 )
 );
 
 
 gl.attachShader(
 program,
-createShader(
+shader(
 gl.FRAGMENT_SHADER,
-fragmentShaderSource
+fragment
 )
 );
 
@@ -247,12 +269,7 @@ gl.useProgram(program);
 
 
 
-
-// Full screen
-
-const buffer =
-gl.createBuffer();
-
+let buffer=gl.createBuffer();
 
 gl.bindBuffer(
 gl.ARRAY_BUFFER,
@@ -263,28 +280,24 @@ buffer
 gl.bufferData(
 gl.ARRAY_BUFFER,
 new Float32Array([
-
 -1,-1,
 1,-1,
 -1,1,
 1,1
-
 ]),
 gl.STATIC_DRAW
 );
 
 
 
-const position =
+let position=
 gl.getAttribLocation(
 program,
 "position"
 );
 
 
-gl.enableVertexAttribArray(
-position
-);
+gl.enableVertexAttribArray(position);
 
 
 gl.vertexAttribPointer(
@@ -298,24 +311,21 @@ false,
 
 
 
-
-// Uniforms
-
-const resolution =
+let res=
 gl.getUniformLocation(
 program,
 "resolution"
 );
 
 
-const timeLocation =
+let tm=
 gl.getUniformLocation(
 program,
 "time"
 );
 
 
-const scrollLocation =
+let scr=
 gl.getUniformLocation(
 program,
 "scroll"
@@ -324,22 +334,19 @@ program,
 
 
 
-// Resize
-
 function resize(){
 
-const dpr =
-Math.min(
-window.devicePixelRatio || 1,
+let dpr=Math.min(
+window.devicePixelRatio||1,
 1.2
 );
 
 
-canvas.width =
+canvas.width=
 innerWidth*dpr;
 
 
-canvas.height =
+canvas.height=
 innerHeight*dpr;
 
 
@@ -352,7 +359,7 @@ canvas.height
 
 
 gl.uniform2f(
-resolution,
+res,
 canvas.width,
 canvas.height
 );
@@ -362,7 +369,6 @@ canvas.height
 
 resize();
 
-
 window.addEventListener(
 "resize",
 resize
@@ -370,54 +376,44 @@ resize
 
 
 
-
-// Scroll
-
-let scrollValue = 0;
+let scroll=0;
 
 
 window.addEventListener(
 "scroll",
 ()=>{
 
-let max =
-document.body.scrollHeight -
-innerHeight;
+let max=
+document.body.scrollHeight-innerHeight;
 
-
-scrollValue =
-max > 0 ?
-scrollY/max :
+scroll=
+max>0?
+scrollY/max:
 0;
 
 });
 
 
 
-
-// Animation
-
-let start =
-performance.now();
+let start=performance.now();
 
 
 function animate(){
 
-let t =
+let t=
 (performance.now()-start)/1000;
 
 
 gl.uniform1f(
-timeLocation,
+tm,
 t
 );
 
 
 gl.uniform1f(
-scrollLocation,
-scrollValue
+scr,
+scroll
 );
-
 
 
 gl.drawArrays(
@@ -435,3 +431,8 @@ animate
 
 
 animate();
+
+
+
+
+==============================
