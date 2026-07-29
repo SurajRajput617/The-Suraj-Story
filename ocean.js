@@ -1,440 +1,257 @@
-// ===============================
-// SURaj Story Ocean Background
-// Mobile Optimized WebGL
-// Part 1/2
-// ===============================
-
 const canvas = document.getElementById("webgl_canvas");
 
 const gl =
-canvas.getContext("webgl2", {
-    alpha:false,
-    antialias:false,
-    powerPreference:"high-performance"
-})
-||
-canvas.getContext("webgl", {
-    alpha:false,
-    antialias:false
-});
+    canvas.getContext("webgl2") ||
+    canvas.getContext("webgl");
 
 
-if(!gl){
-    canvas.style.background="#061522";
+if (!gl) {
+    canvas.style.background = "#061522";
     throw new Error("WebGL not supported");
 }
 
 
+// Vertex Shader
 
-const vertexShader = `
-
+const vertexShaderSource = `
 attribute vec2 position;
 
 void main(){
-
-gl_Position =
-vec4(position,0.0,1.0);
-
+    gl_Position = vec4(position,0.0,1.0);
 }
-
 `;
 
 
+// Fragment Shader
 
-const fragmentShader = `
-
+const fragmentShaderSource = `
 precision mediump float;
-
 
 uniform vec2 resolution;
 uniform float time;
 uniform float scroll;
 
 
-
-float noise(vec2 p){
-
-return fract(
-sin(dot(p,vec2(12.9898,78.233)))
-*43758.5453
-);
-
-}
-
-
-
 void main(){
 
+    vec2 uv = gl_FragCoord.xy / resolution.xy;
 
-vec2 uv =
-gl_FragCoord.xy /
-resolution.xy;
 
+    // Day -> Night color
 
+    vec3 day =
+    vec3(0.15,0.45,0.85);
 
-float scene = scroll;
+    vec3 night =
+    vec3(0.01,0.02,0.08);
 
 
+    vec3 sky =
+    mix(day, night, scroll);
 
-// DAY
 
-vec3 daySky =
-vec3(
-0.25,
-0.55,
-0.95
-);
 
+    // Sun
 
-// STORM
-
-vec3 stormSky =
-vec3(
-0.12,
-0.16,
-0.22
-);
-
-
-// NIGHT
-
-vec3 nightSky =
-vec3(
-0.01,
-0.02,
-0.08
-);
-
-
-
-vec3 sky;
-
-
-if(scene < 0.4){
-
-sky =
-mix(
-daySky,
-stormSky,
-scene*2.5
-);
-
-
-}
-else{
-
-sky =
-mix(
-stormSky,
-nightSky,
-(scene-0.4)*1.7
-);
-
-}
-
-
-
-// SUN
-
-float sun =
-exp(
--distance(
-uv,
-vec2(0.5,0.35)
-)*12.0
-);
-
-
-sky +=
-vec3(1.0,0.65,0.25)
-*sun
-*(1.0-scene);
-
-
-
-// WATER
-
-float water =
-smoothstep(
-0.52,
-0.58,
-uv.y
-);
-
-
-
-vec3 sea =
-vec3(
-0.01,
-0.18,
-0.28
-);
-
-
-
-float wave =
-sin(
-uv.x*25.0+
-time
-)*0.03;
-
-
-
-sea += wave;
-
-
-
-vec3 color =
-mix(
-sea,
-sky,
-water
-);
-
-
-
-// RAIN
-
-if(scene>0.35 && scene<0.75){
-
-float rain =
-noise(
-gl_FragCoord.xy*
-0.05+
-time
-);
-
-
-color +=
-vec3(rain)
-*
-0.12;
-
-}
-
-
-
-// NIGHT STARS
-
-if(scene>0.75){
-
-float stars =
-step(
-0.995,
-noise(
-gl_FragCoord.xy*0.2
-)
-);
-
-
-color +=
-vec3(stars)
-*
-0.8;
-
-}
-
-
-
-gl_FragColor =
-vec4(
-color,
-1.0
-);
-
-
-}
-
-`;
-// ===============================
-// Part 2/2
-// Renderer + Animation + Scroll
-// ===============================
-
-
-function createShader(type, source){
-
-    const shader =
-    gl.createShader(type);
-
-    gl.shaderSource(
-        shader,
-        source
+    float sun =
+    exp(
+        -distance(
+            uv,
+            vec2(0.5,0.35)
+        )*25.0
     );
 
-    gl.compileShader(shader);
+
+    sky += vec3(1.0,0.6,0.2)*sun;
 
 
-    if(!gl.getShaderParameter(
-        shader,
-        gl.COMPILE_STATUS
-    )){
 
-        console.error(
-            gl.getShaderInfoLog(shader)
+    // Water
+
+    float water =
+    smoothstep(
+        0.55,
+        0.56,
+        uv.y
+    );
+
+
+    vec3 ocean =
+    vec3(
+        0.0,
+        0.15,
+        0.25
+    );
+
+
+    float wave =
+    sin(
+        uv.x*30.0 + time
+    )*0.02;
+
+
+    ocean += wave;
+
+
+
+    vec3 color =
+    mix(
+        ocean,
+        sky,
+        water
+    );
+
+
+
+    // Rain effect
+
+    if(scroll > 0.35 && scroll < 0.65){
+
+        float rain =
+        fract(
+            sin(
+            uv.x*500.0+
+            time*5.0
+            )
         );
+
+        color += rain*0.05;
 
     }
 
 
-    return shader;
 
+    gl_FragColor =
+    vec4(color,1.0);
+
+}
+`;
+
+
+
+function createShader(type, source){
+
+    let shader =
+    gl.createShader(type);
+
+    gl.shaderSource(shader,source);
+    gl.compileShader(shader);
+
+
+    if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)){
+        console.log(gl.getShaderInfoLog(shader));
+    }
+
+
+    return shader;
 }
 
 
 
-const vs =
+let vertexShader =
 createShader(
-    gl.VERTEX_SHADER,
-    vertexShader
+gl.VERTEX_SHADER,
+vertexShaderSource
+);
+
+
+let fragmentShader =
+createShader(
+gl.FRAGMENT_SHADER,
+fragmentShaderSource
 );
 
 
 
-const fs =
-createShader(
-    gl.FRAGMENT_SHADER,
-    fragmentShader
-);
-
-
-
-const program =
+let program =
 gl.createProgram();
 
 
-
-gl.attachShader(
-    program,
-    vs
-);
-
-
-gl.attachShader(
-    program,
-    fs
-);
-
-
-
+gl.attachShader(program,vertexShader);
+gl.attachShader(program,fragmentShader);
 gl.linkProgram(program);
-
-
 gl.useProgram(program);
 
 
 
-
-// Full screen quad
-
-const vertices =
+let vertices =
 new Float32Array([
-
 -1,-1,
- 1,-1,
--1, 1,
- 1, 1
-
+1,-1,
+-1,1,
+1,1
 ]);
 
 
 
-const buffer =
+let buffer =
 gl.createBuffer();
 
 
-
 gl.bindBuffer(
-    gl.ARRAY_BUFFER,
-    buffer
+gl.ARRAY_BUFFER,
+buffer
 );
-
 
 
 gl.bufferData(
-    gl.ARRAY_BUFFER,
-    vertices,
-    gl.STATIC_DRAW
+gl.ARRAY_BUFFER,
+vertices,
+gl.STATIC_DRAW
 );
 
 
 
-const position =
+let position =
 gl.getAttribLocation(
-    program,
-    "position"
+program,
+"position"
 );
 
 
-
-gl.enableVertexAttribArray(
-    position
-);
-
+gl.enableVertexAttribArray(position);
 
 
 gl.vertexAttribPointer(
-    position,
-    2,
-    gl.FLOAT,
-    false,
-    0,
-    0
+position,
+2,
+gl.FLOAT,
+false,
+0,
+0
 );
 
 
 
-
-
-const resolution =
+let resolution =
 gl.getUniformLocation(
-    program,
-    "resolution"
+program,
+"resolution"
 );
 
 
-
-const timeLocation =
+let time =
 gl.getUniformLocation(
-    program,
-    "time"
+program,
+"time"
 );
 
 
-
-const scrollLocation =
+let scroll =
 gl.getUniformLocation(
-    program,
-    "scroll"
+program,
+"scroll"
 );
 
-
-
-
-
-// ===============================
-// Resize
-// ===============================
 
 
 function resize(){
 
-
-    const dpr =
-    Math.min(
-        window.devicePixelRatio || 1,
-        1.2
-    );
-
-
-
     canvas.width =
-    window.innerWidth * dpr;
-
+    window.innerWidth;
 
     canvas.height =
-    window.innerHeight * dpr;
-
+    window.innerHeight;
 
 
     gl.viewport(
@@ -443,7 +260,6 @@ function resize(){
         canvas.width,
         canvas.height
     );
-
 
 
     gl.uniform2f(
@@ -455,10 +271,7 @@ function resize(){
 }
 
 
-
 resize();
-
-
 
 window.addEventListener(
 "resize",
@@ -467,124 +280,57 @@ resize
 
 
 
+let start =
+performance.now();
 
 
-// ===============================
-// Scroll Scene Control
-// ===============================
-
-
-let scrollProgress = 0;
-
-
-
-function updateScroll(){
-
-
-    const max =
-    document.documentElement.scrollHeight -
-    window.innerHeight;
-
-
-
-    if(max > 0){
-
-        scrollProgress =
-        window.scrollY / max;
-
-    }
-
-
-}
-
+let scrollValue = 0;
 
 
 window.addEventListener(
 "scroll",
-updateScroll,
-{
- passive:true
-}
-);
+()=>{
+
+let max =
+document.body.scrollHeight -
+window.innerHeight;
+
+
+scrollValue =
+window.scrollY / max || 0;
+
+});
 
 
 
+function render(){
 
-
-// ===============================
-// Animation
-// ===============================
-
-
-let startTime =
+let now =
 performance.now();
 
 
-
-function animate(){
-
-
-    let now =
-    performance.now();
+gl.uniform1f(
+time,
+(now-start)/1000
+);
 
 
-
-    let seconds =
-    (now-startTime)/1000;
-
-
-
-    gl.uniform1f(
-        timeLocation,
-        seconds
-    );
+gl.uniform1f(
+scroll,
+scrollValue
+);
 
 
-
-    gl.uniform1f(
-        scrollLocation,
-        scrollProgress
-    );
-
-
-
-    gl.drawArrays(
-        gl.TRIANGLE_STRIP,
-        0,
-        4
-    );
+gl.drawArrays(
+gl.TRIANGLE_STRIP,
+0,
+4
+);
 
 
-
-    requestAnimationFrame(
-        animate
-    );
-
+requestAnimationFrame(render);
 
 }
 
 
-
-animate();
-
-
-
-
-// ===============================
-// Mobile Memory Saving
-// ===============================
-
-
-document.addEventListener(
-"visibilitychange",
-()=>{
-
-    if(document.hidden){
-
-        gl.clear(
-            gl.COLOR_BUFFER_BIT
-        );
-
-    }
-
-});
+render();
