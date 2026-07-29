@@ -1,98 +1,178 @@
-const canvas = document.getElementById("webgl_canvas");
-const ctx = canvas.getContext("2d");
+// Lightweight Mobile Friendly Ocean Background
 
-let width;
-let height;
+const canvas = document.getElementById("webgl_canvas");
+
+const ctx = canvas.getContext("2d", {
+    alpha: false,
+    desynchronized: true
+});
+
+
+let width = 0;
+let height = 0;
 let time = 0;
 
-function resize() {
-    width = canvas.width = window.innerWidth;
-    height = canvas.height = window.innerHeight;
+
+function resizeCanvas(){
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.2);
+
+    width = window.innerWidth;
+    height = window.innerHeight;
+
+
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+
+
+    canvas.style.width = width + "px";
+    canvas.style.height = height + "px";
+
+
+    ctx.setTransform(dpr,0,0,dpr,0,0);
 }
 
-window.addEventListener("resize", resize);
-resize();
 
+resizeCanvas();
 
-function drawOcean() {
-
-    time += 0.02;
-
-    ctx.clearRect(0, 0, width, height);
-
-
-    // Sky background
-    let sky = ctx.createLinearGradient(0, 0, 0, height);
-    sky.addColorStop(0, "#071526");
-    sky.addColorStop(0.5, "#092d46");
-    sky.addColorStop(1, "#02080f");
-
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, width, height);
+window.addEventListener(
+    "resize",
+    resizeCanvas,
+    {passive:true}
+);
 
 
 
-    // Water waves
-    for (let layer = 0; layer < 8; layer++) {
+// Draw water
+
+function drawOcean(){
+
+
+    time += 0.015;
+
+
+    // sky + ocean background
+
+    let gradient = ctx.createLinearGradient(
+        0,
+        0,
+        0,
+        height
+    );
+
+
+    gradient.addColorStop(
+        0,
+        "#071827"
+    );
+
+    gradient.addColorStop(
+        0.55,
+        "#092f4a"
+    );
+
+    gradient.addColorStop(
+        1,
+        "#020b14"
+    );
+
+
+    ctx.fillStyle = gradient;
+
+    ctx.fillRect(
+        0,
+        0,
+        width,
+        height
+    );
+
+
+
+    // 3 water layers only for mobile performance
+
+    for(let layer = 0; layer < 3; layer++){
+
 
         ctx.beginPath();
 
-        let base = height * 0.55 + layer * 40;
 
-        ctx.moveTo(0, height);
+        let base =
+        height * 0.55 +
+        layer * 45;
 
-        for (let x = 0; x <= width; x += 10) {
+
+        ctx.moveTo(
+            0,
+            height
+        );
+
+
+        for(
+            let x = 0;
+            x <= width;
+            x += 25
+        ){
+
 
             let wave =
-                Math.sin(
-                    x * 0.015 +
-                    time * (1 + layer * 0.15)
-                ) * 20;
+            Math.sin(
+                x * 0.018 +
+                time +
+                layer
+            ) * 18;
 
-            let y = base + wave;
 
-            ctx.lineTo(x, y);
+            let y =
+            base + wave;
+
+
+            ctx.lineTo(
+                x,
+                y
+            );
         }
 
-        ctx.lineTo(width, height);
+
+
+        ctx.lineTo(
+            width,
+            height
+        );
+
+
         ctx.closePath();
 
 
+
         ctx.fillStyle =
-            `rgba(20,120,170,${0.08 + layer * 0.02})`;
+        `rgba(20,120,180,${0.18-layer*0.03})`;
+
 
         ctx.fill();
+
     }
 
 
-
-    // Reflection light
-
-    for(let i=0;i<20;i++){
-
-        let x = (width/2) + 
-            Math.sin(time+i)*120;
-
-        let y = height*0.55 + i*8;
-
-
-        ctx.beginPath();
-
-        ctx.arc(
-            x,
-            y,
-            2,
-            0,
-            Math.PI*2
-        );
-
-        ctx.fillStyle="rgba(255,220,150,0.3)";
-        ctx.fill();
-    }
 
 
     requestAnimationFrame(drawOcean);
+
 }
 
 
 drawOcean();
+
+
+
+// Stop animation when tab hidden
+// saves mobile memory
+
+document.addEventListener(
+"visibilitychange",
+()=>{
+
+    if(document.hidden){
+        cancelAnimationFrame(drawOcean);
+    }
+
+});
