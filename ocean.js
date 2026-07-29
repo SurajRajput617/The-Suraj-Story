@@ -1,16 +1,9 @@
-// ======================================
-// Suraj Story Weather Ocean
-// Part 1/2
-// ======================================
-
 const canvas = document.getElementById("webgl_canvas");
-
 
 const gl =
 canvas.getContext("webgl2", {
     alpha:false,
-    antialias:false,
-    powerPreference:"high-performance"
+    antialias:false
 })
 ||
 canvas.getContext("webgl", {
@@ -20,40 +13,25 @@ canvas.getContext("webgl", {
 
 
 if(!gl){
-    canvas.style.background="#08131f";
-    throw new Error("WebGL not supported");
+    canvas.style.background="#071522";
+    throw "WebGL not supported";
 }
 
 
 
-// ================================
-// Vertex Shader
-// ================================
-
-const vertexShaderSource = `
-
+const vertex = `
 attribute vec2 position;
 
 void main(){
-
-    gl_Position =
-    vec4(position,0.0,1.0);
-
+    gl_Position = vec4(position,0.0,1.0);
 }
-
 `;
 
 
 
-// ================================
-// Fragment Shader
-// Weather Engine
-// ================================
-
-const fragmentShaderSource = `
+const fragment = `
 
 precision mediump float;
-
 
 uniform vec2 resolution;
 uniform float time;
@@ -61,7 +39,7 @@ uniform float scroll;
 
 
 
-float hash(vec2 p){
+float noise(vec2 p){
 
     return fract(
         sin(dot(p,vec2(12.9898,78.233)))
@@ -72,130 +50,75 @@ float hash(vec2 p){
 
 
 
-float noise(vec2 p){
-
-    vec2 i=floor(p);
-    vec2 f=fract(p);
-
-    f=f*f*(3.0-2.0*f);
-
-    float a=hash(i);
-    float b=hash(i+vec2(1.0,0.0));
-    float c=hash(i+vec2(0.0,1.0));
-    float d=hash(i+vec2(1.0,1.0));
-
-    return mix(
-        mix(a,b,f.x),
-        mix(c,d,f.x),
-        f.y
-    );
-
-}
-
-
-
-
 void main(){
 
-
     vec2 uv =
-    gl_FragCoord.xy /
-    resolution.xy;
+    gl_FragCoord.xy / resolution.xy;
 
 
 
-    // =========================
-    // Weather timeline
-    // 0 Day
-    // 0.33 Midday
-    // 0.66 Rain
-    // 1 Night
-    // =========================
+    // WEATHER COLORS
 
+    vec3 dawn =
+    vec3(0.65,0.45,0.38);
 
     vec3 day =
-    vec3(
-        0.25,
-        0.55,
-        0.95
-    );
-
-
-    vec3 midday =
-    vec3(
-        0.05,
-        0.35,
-        0.85
-    );
-
+    vec3(0.20,0.55,0.95);
 
     vec3 storm =
-    vec3(
-        0.12,
-        0.16,
-        0.22
-    );
-
+    vec3(0.15,0.18,0.25);
 
     vec3 night =
-    vec3(
-        0.01,
-        0.02,
-        0.08
-    );
+    vec3(0.01,0.02,0.08);
 
 
 
     vec3 sky;
 
 
+    if(scroll < .33){
 
-    if(scroll < 0.33){
-
-        sky =
-        mix(
+        sky=mix(
+            dawn,
             day,
-            midday,
             scroll*3.0
         );
 
     }
-    else if(scroll < 0.66){
+    else if(scroll < .66){
 
-        sky =
-        mix(
-            midday,
+        sky=mix(
+            day,
             storm,
-            (scroll-0.33)*3.0
+            (scroll-.33)*3.0
         );
 
     }
     else{
 
-        sky =
-        mix(
+        sky=mix(
             storm,
             night,
-            (scroll-0.66)*3.0
+            (scroll-.66)*3.0
         );
 
     }
 
 
 
-    // Sun
+    // SUN
 
     float sun =
     exp(
         -distance(
             uv,
-            vec2(0.5,0.35)
+            vec2(.5,.35)
         )*25.0
     );
 
 
     sky +=
-    vec3(1.0,0.65,0.25)
+    vec3(1.0,.7,.3)
     *
     sun
     *
@@ -203,434 +126,308 @@ void main(){
 
 
 
-    // Ocean
-
-    float water =
-    smoothstep(
-        0.50,
-        0.55,
-        uv.y
-    );
-
+    // OCEAN
 
     float wave =
-    sin(
-        uv.x*35.0+
-        time
-    )*0.03;
+    (
+        sin(
+            uv.x*25.0+time
+        )
+        +
+        sin(
+            uv.x*12.0-time*.5
+        )
+    )
+    *.015;
 
 
 
-    vec3 sea =
-    vec3(
-        0.01,
-        0.18,
-        0.30
+    float horizon =
+    smoothstep(
+        .40,
+        .65,
+        uv.y+wave
     );
 
 
-    sea += wave;
+
+    vec3 water =
+    vec3(
+        .01,
+        .16,
+        .28
+    );
+
+
+
+    // WATER LIGHT
+
+    float reflection =
+    sin(
+        uv.x*40.0+
+        time*2.0
+    )*.03;
+
+
+    water += reflection;
 
 
 
     vec3 color =
     mix(
-        sea,
+        water,
         sky,
-        water
+        horizon
     );
 
 
 
-    // Rain in storm
+    // RAIN
 
-    if(scroll > 0.45 && scroll < 0.75){
+    if(scroll>.40 && scroll<.75){
 
         float rain =
         noise(
-            gl_FragCoord.xy*0.08+
-            time*2.0
+            gl_FragCoord.xy*.08+
+            time
         );
 
 
         color +=
-        vec3(rain)
-        *
-        0.15;
+        vec3(rain)*.12;
 
     }
 
 
 
-    // Stars at night
+    // STARS
 
-    if(scroll > 0.75){
+    if(scroll>.75){
 
-        float stars =
+        float star =
         step(
-            0.997,
+            .997,
             noise(
-            gl_FragCoord.xy*0.3
+                gl_FragCoord.xy*.3
             )
         );
 
 
         color +=
-        vec3(stars);
+        vec3(star);
 
     }
 
 
 
     gl_FragColor =
-    vec4(
-        color,
-        1.0
-    );
+    vec4(color,1.0);
 
 }
 
 `;
-// ======================================
-// Part 2/2
-// WebGL Renderer + Scroll System
-// ======================================
 
 
-function createShader(type, source){
 
-    const shader =
-    gl.createShader(type);
+function shader(type,source){
 
+    let s=gl.createShader(type);
 
-    gl.shaderSource(
-        shader,
-        source
-    );
+    gl.shaderSource(s,source);
 
+    gl.compileShader(s);
 
-    gl.compileShader(shader);
-
-
-    if(!gl.getShaderParameter(
-        shader,
-        gl.COMPILE_STATUS
-    )){
-
-        console.error(
-            gl.getShaderInfoLog(shader)
-        );
-
-    }
-
-
-    return shader;
-
+    return s;
 }
 
 
 
-const vertexShader =
-createShader(
-    gl.VERTEX_SHADER,
-    vertexShaderSource
-);
-
-
-
-const fragmentShader =
-createShader(
-    gl.FRAGMENT_SHADER,
-    fragmentShaderSource
-);
-
-
-
-const program =
-gl.createProgram();
-
+let program=gl.createProgram();
 
 
 gl.attachShader(
-    program,
-    vertexShader
+program,
+shader(
+gl.VERTEX_SHADER,
+vertex
+)
 );
 
 
 gl.attachShader(
-    program,
-    fragmentShader
+program,
+shader(
+gl.FRAGMENT_SHADER,
+fragment
+)
 );
-
 
 
 gl.linkProgram(program);
-
 
 gl.useProgram(program);
 
 
 
-
-// Full screen rectangle
-
-const vertices =
-new Float32Array([
-
-    -1,-1,
-     1,-1,
-    -1, 1,
-     1, 1
-
-]);
-
-
-
-const buffer =
-gl.createBuffer();
-
-
+let buffer=gl.createBuffer();
 
 gl.bindBuffer(
-    gl.ARRAY_BUFFER,
-    buffer
+gl.ARRAY_BUFFER,
+buffer
 );
-
 
 
 gl.bufferData(
-    gl.ARRAY_BUFFER,
-    vertices,
-    gl.STATIC_DRAW
+gl.ARRAY_BUFFER,
+new Float32Array([
+-1,-1,
+1,-1,
+-1,1,
+1,1
+]),
+gl.STATIC_DRAW
 );
 
 
 
-const position =
+let position=
 gl.getAttribLocation(
-    program,
-    "position"
+program,
+"position"
 );
 
 
-
-gl.enableVertexAttribArray(
-    position
-);
-
+gl.enableVertexAttribArray(position);
 
 
 gl.vertexAttribPointer(
-    position,
-    2,
-    gl.FLOAT,
-    false,
-    0,
-    0
+position,
+2,
+gl.FLOAT,
+false,
+0,
+0
 );
 
 
 
-
-// Uniforms
-
-const resolution =
+let res=
 gl.getUniformLocation(
-    program,
-    "resolution"
+program,
+"resolution"
 );
 
 
-const timeLocation =
+let tm=
 gl.getUniformLocation(
-    program,
-    "time"
+program,
+"time"
 );
 
 
-const scrollLocation =
+let scr=
 gl.getUniformLocation(
-    program,
-    "scroll"
+program,
+"scroll"
 );
 
 
 
-
-
-// ==============================
-// Mobile Optimized Resize
-// ==============================
 
 function resize(){
 
-
-    const dpr =
-    Math.min(
-        window.devicePixelRatio || 1,
-        1.2
-    );
+let dpr=Math.min(
+window.devicePixelRatio||1,
+1.2
+);
 
 
-    canvas.width =
-    window.innerWidth * dpr;
+canvas.width=
+innerWidth*dpr;
 
 
-    canvas.height =
-    window.innerHeight * dpr;
+canvas.height=
+innerHeight*dpr;
 
 
-
-    canvas.style.width =
-    "100%";
-
-
-    canvas.style.height =
-    "100%";
-
+gl.viewport(
+0,
+0,
+canvas.width,
+canvas.height
+);
 
 
-    gl.viewport(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-    );
-
-
-
-    gl.uniform2f(
-        resolution,
-        canvas.width,
-        canvas.height
-    );
+gl.uniform2f(
+res,
+canvas.width,
+canvas.height
+);
 
 }
-
 
 
 resize();
 
-
-
 window.addEventListener(
-    "resize",
-    resize
+"resize",
+resize
 );
 
 
 
-
-// ==============================
-// Scroll Weather Control
-// ==============================
-
-let scrollValue = 0;
-
-
-
-function updateScroll(){
-
-
-    let maxScroll =
-    document.documentElement.scrollHeight -
-    window.innerHeight;
-
-
-
-    if(maxScroll > 0){
-
-        scrollValue =
-        window.scrollY / maxScroll;
-
-    }
-
-}
-
+let scroll=0;
 
 
 window.addEventListener(
-    "scroll",
-    updateScroll,
-    {
-        passive:true
-    }
-);
-
-
-
-
-// ==============================
-// Animation Loop
-// ==============================
-
-
-let startTime =
-performance.now();
-
-
-
-function render(){
-
-
-    let now =
-    performance.now();
-
-
-
-    let currentTime =
-    (now-startTime)/1000;
-
-
-
-    gl.uniform1f(
-        timeLocation,
-        currentTime
-    );
-
-
-
-    gl.uniform1f(
-        scrollLocation,
-        scrollValue
-    );
-
-
-
-    gl.drawArrays(
-        gl.TRIANGLE_STRIP,
-        0,
-        4
-    );
-
-
-
-    requestAnimationFrame(
-        render
-    );
-
-}
-
-
-
-render();
-
-
-
-
-// ==============================
-// Mobile Memory Protection
-// ==============================
-
-
-document.addEventListener(
-"visibilitychange",
+"scroll",
 ()=>{
 
-    if(document.hidden){
+let max=
+document.body.scrollHeight-innerHeight;
 
-        gl.finish();
-
-    }
+scroll=
+max>0?
+scrollY/max:
+0;
 
 });
+
+
+
+let start=performance.now();
+
+
+function animate(){
+
+let t=
+(performance.now()-start)/1000;
+
+
+gl.uniform1f(
+tm,
+t
+);
+
+
+gl.uniform1f(
+scr,
+scroll
+);
+
+
+gl.drawArrays(
+gl.TRIANGLE_STRIP,
+0,
+4
+);
+
+
+requestAnimationFrame(
+animate
+);
+
+}
+
+
+animate();
